@@ -167,6 +167,12 @@
 #include "board-rdtags.h"
 #endif
 
+#ifdef CONFIG_KEXEC_HARDBOOT
+#include <asm/setup.h>
+#include <asm/memory.h>
+#define SONY_PERSISTENT_RAM_SIZE	(SZ_1M)
+#endif
+
 static struct platform_device msm_fm_platform_init = {
 	.name = "iris_fm",
 	.id   = -1,
@@ -1628,6 +1634,27 @@ early_param("ext_display", ext_display_setup);
 
 static void __init msm8960_reserve(void)
 {
+#ifdef CONFIG_KEXEC_HARDBOOT
+	// Reserve space for hardboot page - just after ram_console,
+	// at the start of second memory bank
+	int ret;
+	phys_addr_t start;
+	struct membank* bank;
+
+	if (meminfo.nr_banks < 2) {
+		pr_err("%s: not enough membank\n", __func__);
+		return;
+	}
+
+	bank = &meminfo.bank[1];
+	start = bank->start + SZ_1M + SONY_PERSISTENT_RAM_SIZE;
+	ret = memblock_remove(start, SZ_1M);
+	if(!ret)
+		pr_info("Hardboot page reserved at 0x%X\n", start);
+	else
+		pr_err("Failed to reserve space for hardboot page at 0x%X!\n", start);
+#endif
+
 #if defined(CONFIG_ANDROID_RAM_CONSOLE) || defined(CONFIG_RAMDUMP_TAGS) || \
 	defined(CONFIG_RAMDUMP_CRASH_LOGS)
 	reserve_debug_memory();
